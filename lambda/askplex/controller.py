@@ -1,6 +1,6 @@
 import random
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from logging import Logger
 
 from ask_sdk_model import Response
@@ -13,9 +13,12 @@ from ask_sdk_core.utils import get_slot_value_v2
 from plexapi.audio import Track
 from plexapi.server import PlexServer
 from plexapi.exceptions import NotFound
+from plexapi.myplex import MyPlexAccount
+from plexapi.library import MusicSection
 
 from . import config
 from . import prompts
+from . import plexapi_utils
 
 class Controller:
     """
@@ -85,6 +88,9 @@ class Controller:
         play_playlist() -> Response:
             Plays a Plex playlist.
     """
+
+    _section: MusicSection = None
+
     def __init__(self, logger : Logger, handler_input : HandlerInput) -> None:
         """
         Initializes the controller with a logger and the handler input instance.
@@ -571,6 +577,80 @@ class Controller:
 #
 # Plex API utils
 #
+    def _create_plex_server(self) -> PlexServer:
+        """
+        PlexServerインスタンスを生成し、サーバーへの接続を確立する。
+        接続は以下の優先順位で試行される：
+        1. 設定 (`config.PMS_USE_SERVER_URL`) が有効な場合、指定されたURLとトークンで直接接続。
+        2. 無効な場合は MyPlexAccount を経由し、対象のリソース（サーバー名）を取得。
+        3. 取得したリソースの接続リストから、外部接続かつHTTPS（plex.direct）URLを探して接続試行。
+        4. 上記が失敗、または見つからない場合、`resource.connect()` による自動フォールバック。
+
+        Returns:
+            PlexServer: 接続が確立されたPlexServerオブジェクト。
+
+        Raises:
+            Exception: 有効な接続先が見つからない場合や、MyPlexへの認証に失敗した場合、
+                       またはすべての接続試行がタイムアウトした場合にスローされる。
+        """
+        if config.PMS_USE_SERVER_URL:
+            return PlexServer(config.PMS_SERVER_URL, config.PMS_SERVER_TOKEN)
+        plex_server = None
+        account = MyPlexAccount(token=config.PMS_SERVER_TOKEN)
+        resource = account.resource(config.PMS_SERVER_NAME)
+        target_url = next((c.uri for c in resource.connections if not c.local and c.uri.startswith('https') and "plex.direct" in c.uri), None)
+        if target_url:
+            try:
+                plex_server = PlexServer(target_url, config.PMS_SERVER_TOKEN, timeout=3)
+            except Exception as exception:
+                self.logger.warning(f"Direct URL connection failed: {exception}. Falling back to resource.connect()")
+        if plex_server is None:
+            plex_server = resource.connect(timeout=3)
+        return plex_server
+
+    def connect_plex(self) -> tuple[bool, Optional[Response]]:
+        """
+        Plexサーバーおよび指定されたライブラリセクションへの接続を確立する。
+        すでに接続済み（キャッシュあり）の場合は、接続処理をスキップして正常終了を返す。
+        未接続の場合は設定に基づきサーバーへ接続し、対象のセクション（Music等）をクラス変数 `_section` にキャッシュする。
+
+        Returns:
+            tuple[bool, Optional[Response]]: 
+                - bool: 接続成功時は True、失敗時は False。
+                - Response: 失敗時はユーザーにエラーを伝えるための応答オブジェクト。
+                           成功時は None。
+
+        Raises:
+            NotFound: 指定されたセクション名がサーバー内に存在しない場合。
+            Exception: 認証失敗、タイムアウト、ネットワーク不通などの接続エラー。
+        """
+
+        self.logger.debug('In connect_plex()')
+
+        if Controller._section is not None:
+            self.logger.debug('Already connected.')
+            return True, None
+
+        self.logger.info(f"Connecting to section: {config.PMS_DEFAULT_SECTION_NAME}")
+
+        # get localization data
+        data = self.handler_input.attributes_manager.request_attributes["_"]
+
+        try:
+            plex_server = self._create_plex_server()
+            section = plex_server.library.section(config.PMS_DEFAULT_SECTION_NAME)
+            Controller._section = section
+            self.logger.info('Successfully connected to section.')
+            return True, None
+        except NotFound as exception:
+            self.logger.error(f"Plex section not found: {exception}")
+            speak_output = data[prompts.PMS_SECTION_NOT_FOUND]
+        except Exception as exception:
+            self.logger.error(f"Plex connection error: {exception}")
+            speak_output = data[prompts.PMS_CONNECTION_ERROR]
+        return False, self._build_speak_ask_response(speak_output)
+
+    # TODO: Delete.
     def load_music_section (self) -> Response:
         """
         Loads the music section from the Plex server.
@@ -673,23 +753,18 @@ class Controller:
         # get localization data
         data = self.handler_input.attributes_manager.request_attributes["_"]
 
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
-
         # Search for random tracks
         try:
-            plex_track_list = self.section.searchTracks(sort='random', maxresults=config.PMS_DEFAULT_MAX_RESULTS)
+            plex_track_list = plexapi_utils.get_random_tracks(Controller._section, config.PMS_DEFAULT_MAX_RESULTS)
         except Exception as exception:
             speak_output = data[prompts.PMS_CONNECTION_ERROR]
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         if len(plex_track_list) == 0:
             speak_output = data[prompts.PMS_TRACKS_SEARCH_EMPTY]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
@@ -726,34 +801,30 @@ class Controller:
         if artist is None:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
-
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the artist
         try:
-            artist_results = self.section.searchArtists(title=artist.value)
+            artist_result = plexapi_utils.get_artist(self.section, title=artist.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
-        if len(artist_results) == 0:
+        if artist_result is None:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         # Get a list the popular tracks by the artist
-        plex_track_list = artist_results[0].popularTracks()
+        plex_track_list = artist_result.popularTracks()
         if len(plex_track_list) == 0:
             # No popular tracks, so look for any tracks
-            plex_track_list = artist_results[0].tracks()
+            plex_track_list = plexapi_utils.get_random_tracks_by_artist(config.PMS_DEFAULT_MAX_RESULTS, artist_result)
             if len(plex_track_list) == 0:
                 speak_output = data[prompts.PMS_TRACKS_SEARCH_EMPTY]
-                return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+                return self._build_speak_ask_response(speak_output)
+
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
@@ -789,37 +860,33 @@ class Controller:
         if artist is None or song is None:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
-
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the artist
         try:
-            artist_results = self.section.searchArtists(title=artist.value)
+            artist_result = plexapi_utils.get_artist(self.section, title=artist.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
-        if len(artist_results) == 0:
+        if artist_result is None:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the song
         try:
-            plex_track = artist_results[0].track(song.value)
-        except NotFound  as exception:
-            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song.value, artist=artist.value)
-            self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            plex_track = plexapi_utils.get_track(artist_result, song.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song.value, artist=artist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
+
+        if plex_track is None:
+            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song.value, artist=artist.value)
+            self.logger.error(exception)
+            return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_track(plex_track)
@@ -855,37 +922,33 @@ class Controller:
         if artist is None or album is None:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
-
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the artist
         try:
-            artist_results = self.section.searchArtists(title=artist.value)
+            artist_result = plexapi_utils.get_artist(self.section, artist.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
-        if len(artist_results) == 0:
+        if artist_result is None:
             speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the album
         try:
-            plex_track_list = artist_results[0].album(album.value)
-        except NotFound  as exception:
-            speak_output = data[prompts.PMS_ALBUM_SEARCH_EMPTY].format(album=album.value, artist=artist.value)
-            self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            plex_track_list = plexapi_utils.get_album(artist_result, album.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_ALBUM_SEARCH_ERROR].format(album.value, artist=artist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
+
+        if plex_track_list is None:
+            speak_output = data[prompts.PMS_ALBUM_SEARCH_EMPTY].format(album=album.value, artist=artist.value)
+            self.logger.error(exception)
+            return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
@@ -920,7 +983,7 @@ class Controller:
         if genre is None:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         # Get the music section
         response = self.load_music_section()
@@ -929,16 +992,16 @@ class Controller:
 
         # Search for the style (Plex server is more specfic with style than genre tags)
         try:
-            plex_track_list = self.section.searchTracks(sort='random', maxresults=config.PMS_DEFAULT_MAX_RESULTS, style=genre.value)
+            plex_track_list = plexapi_utils.get_random_tracks_by_genre(Controller._section, config.PMS_DEFAULT_MAX_RESULTS, genre.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_GENRE_SEARCH_ERROR].format(genre.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         if len(plex_track_list)==0:
             speak_output = data[prompts.PMS_GENRE_SEARCH_EMPTY].format(genre.value)
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
@@ -973,24 +1036,20 @@ class Controller:
         if playlist is None:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
-
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
+            return self._build_speak_ask_response(speak_output)
 
         # Search for the playlist
         try:
-            plex_track_list =  self.section.playlist(title=playlist.value)
-        except NotFound  as exception:
-            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_EMPTY].format(playlist.value)
-            self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            plex_track_list = plexapi_utils.get_playlist(Controller._section._server, playlist.value)
         except Exception as exception:
             speak_output = data[prompts.PMS_PLAYLIST_SEARCH_ERROR].format(playlist.value)
             self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
+            return self._build_speak_ask_response(speak_output)
+
+        if plex_track_list is None:
+            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_EMPTY].format(playlist.value)
+            self.logger.error(speak_output)
+            return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
@@ -1002,3 +1061,25 @@ class Controller:
         self.handler_input.response_builder.speak(speak_output)
         self.logger.info(speak_output)
         return self.start_playback()
+
+
+#
+# ASK SDK utils
+#
+    def _build_speak_ask_response(self, speak_output) -> Response:
+        """
+        ユーザーにエラーを通知し、再試行を促すための応答オブジェクトを生成する。
+
+        Args:
+            speak_output (str): ユーザーに対して読み上げるエラーメッセージの内容。
+
+        Returns:
+            Response: speak および ask プロパティが設定された Alexa SDK の Response オブジェクト。
+                      これにより、音声出力の後にマイクがオープンになり、ユーザーの応答を待つ。
+        """
+        return (
+            self.handler_input.response_builder
+            .speak(speak_output)
+            .ask(speak_output)
+            .response
+        )
