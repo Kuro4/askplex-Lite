@@ -67,8 +67,6 @@ class Controller:
             Handles the event when playback is finished.
         playback_failed() -> Response:
             Handles the playback failure scenario.
-        load_music_section() -> Response:
-            Connects to a plex media server and loads the music section.
         set_playlist_name(name: str) -> None:
             Sets the playlist name used by alexa.
         add_plex_track(plex_track: Track) -> None:
@@ -608,6 +606,7 @@ class Controller:
             plex_server = resource.connect(timeout=3)
         return plex_server
 
+
     def connect_plex(self) -> tuple[bool, Optional[Response]]:
         """
         Plexサーバーおよび指定されたライブラリセクションへの接続を確立する。
@@ -649,36 +648,6 @@ class Controller:
             self.logger.error(f"Plex connection error: {exception}")
             speak_output = data[prompts.PMS_CONNECTION_ERROR]
         return False, self._build_speak_ask_response(speak_output)
-
-    # TODO: Delete.
-    def load_music_section (self) -> Response:
-        """
-        Loads the music section from the Plex server.
-        This method attempts to connect to the Plex server using the provided
-        configuration and retrieves the default music section. If the section
-        is not found or there is a connection error, it handles the exceptions
-        and returns an appropriate response.
-        Returns:
-            Response: The response object containing the speech output in case of error,
-            otherwize returns None.
-        """
-
-        self.logger.debug('In load_music_section()')
-
-        # get localization data
-        data = self.handler_input.attributes_manager.request_attributes["_"]
-
-        try:
-            self.plex_server = PlexServer(config.PMS_SERVER_URL, config.PMS_SERVER_TOKEN)
-            self.section = self.plex_server.library.section(config.PMS_DEFAULT_SECTION_NAME)
-        except NotFound  as exception:
-            speak_output = data[prompts.PMS_SECTION_NOT_FOUND]
-            self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
-        except Exception as exception:
-            speak_output = data[prompts.PMS_CONNECTION_ERROR]
-            self.logger.error(exception)
-            return self.handler_input.response_builder.speak(speak_output).ask(speak_output).response
 
 
     def set_playlist_name(self, name: str) -> None:
@@ -984,11 +953,6 @@ class Controller:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
-
-        # Get the music section
-        response = self.load_music_section()
-        if response is not None:
-            return response
 
         # Search for the style (Plex server is more specfic with style than genre tags)
         try:

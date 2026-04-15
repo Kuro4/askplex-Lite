@@ -115,6 +115,9 @@ class LaunchRequestHandler(AbstractRequestHandler):
         persistence_attr = handler_input.attributes_manager.persistent_attributes
         playback_info = persistence_attr.get("playback_info")
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
 
         # Check if there is a previous playback currently playing
         if playback_info.get("in_playback_session"):
@@ -170,6 +173,9 @@ class YesHandler(AbstractRequestHandler):
 
         if session_attr.get("request") == "resume":
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.resume_playback()
 
         return handler_input.response_builder.response
@@ -200,11 +206,15 @@ class NoHandler(AbstractRequestHandler):
             playback_info = persistence_attr.get("playback_info")
 
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             player_controller.clear_playlist()
             playback_info["in_playback_session"] = False
 
             session_attr["request"]="action"
             speak_output = data[prompts.SKILL_WELCOME_REPROMPT]
+            # TODO: Create ASK_SDK Utils.
             handler_input.response_builder.speak(speak_output).ask(speak_output)
 
         return handler_input.response_builder.response
@@ -262,6 +272,9 @@ class ResumePlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.resume_playback()
 
 
@@ -285,6 +298,9 @@ class StartOverPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.start_playback()
 
 
@@ -312,6 +328,9 @@ class PausePlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.pause_playback()
 
         return handler_input.response_builder.response
@@ -340,6 +359,9 @@ class PreviousPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.previous_playback()
 
         return handler_input.response_builder.response
@@ -368,6 +390,9 @@ class NextPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.next_playback()
 
         return handler_input.response_builder.response
@@ -392,6 +417,9 @@ class ShuffleOnPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.shuffle_playback(True)
 
         return handler_input.response_builder.response
@@ -416,6 +444,9 @@ class ShuffleOffPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.shuffle_playback(False)
 
         return handler_input.response_builder.response
@@ -431,6 +462,7 @@ class LoopOnPlaybackHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return is_intent_name('AMAZON.LoopOnIntent')(handler_input)
+
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         logger.debug('In LoopOnPlaybackHandler()')
@@ -439,6 +471,9 @@ class LoopOnPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.loop_playback(True)
 
         return handler_input.response_builder.response
@@ -463,6 +498,9 @@ class LoopOffPlaybackHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             return player_controller.loop_playback(False)
 
         return handler_input.response_builder.response
@@ -483,6 +521,9 @@ class PlaybackStartedHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaybackStartedHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.playback_started()
 
 
@@ -501,6 +542,9 @@ class PlaybackStoppedHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaybackStoppedHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.playback_stopped()
 
 
@@ -520,6 +564,9 @@ class PlaybackNearlyFinishedHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaybackNearlyFinishedHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.playback_nearly_finished()
 
 
@@ -538,6 +585,9 @@ class PlaybackFinishedHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaybackFinishedHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.playback_finished()
 
 
@@ -556,6 +606,9 @@ class PlaybackFailedEventHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaybackFailedEventHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.playback_failed()
 
 
@@ -581,6 +634,9 @@ class PlaybackSongDetailsHandler(AbstractRequestHandler):
 
         if playback_info.get("in_playback_session"):
             player_controller = controller.Controller(logger, handler_input)
+            result, response = player_controller.connect_plex()
+            if not result:
+                return response
             current_track = player_controller.get_current_track()
 
             if current_track is not None:
@@ -609,6 +665,9 @@ class PlayRandomMusicHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlayRandomMusicHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_random_music()
 
 
@@ -627,6 +686,9 @@ class PlayMusicByArtistHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlayMusicByArtistHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_music_by_artist()
 
 
@@ -645,6 +707,9 @@ class PlaySongByArtistHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlaySongByArtistHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_song_by_artist()
 
 
@@ -663,6 +728,9 @@ class PlayAlbumByArtistHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlayAlbumByArtistHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_album_by_artist()
 
 
@@ -681,6 +749,9 @@ class PlayMusicByGenreHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlayMusicByGenreHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_music_by_genre()
 
 
@@ -699,6 +770,9 @@ class PlayPlaylistHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         logger.debug('In PlayPlaylistHandler()')
         player_controller = controller.Controller(logger, handler_input)
+        result, response = player_controller.connect_plex()
+        if not result:
+            return response
         return player_controller.play_playlist()
 
 
