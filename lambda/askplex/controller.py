@@ -303,8 +303,11 @@ class Controller:
                     )
                 ]
             )
+        id = track["id"]
+        url = Controller._section.fetchItem(id).getStreamURL().replace("m3u8", "mp3")
 
-        stream = Stream(token=track["id"], url=track["uri"], offset_in_milliseconds=offset, expected_previous_token=previous_token)
+        #stream = Stream(token=track["id"], url=track["uri"], offset_in_milliseconds=offset, expected_previous_token=previous_token)
+        stream = Stream(token=id, url=url, offset_in_milliseconds=offset, expected_previous_token=previous_token)
         return AudioItem(stream=stream, metadata=metadata)
 
 
@@ -684,7 +687,7 @@ class Controller:
                 "artist_art": plex_track.url(plex_track.grandparentArt),
                 "album": plex_track.parentTitle,
                 "album_art": plex_track.url(plex_track.parentThumb),
-                "uri": plex_track.getStreamURL().replace("m3u8", "mp3")
+                #"uri": plex_track.getStreamURL().replace("m3u8", "mp3")
                 }
 
         self.add_track(track)
