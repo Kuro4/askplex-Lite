@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from plexapi.library import MusicSection
 from plexapi.server import PlexServer
 from plexapi.audio import Artist, Track, Album
@@ -102,7 +102,7 @@ def get_playlist(server: PlexServer, title: str) -> Optional[Playlist]:
     
     return None
 
-def get_random_tracks(section: MusicSection, maxresults: int) -> list[Track]:
+def get_random_tracks(section: MusicSection, maxresults: int) -> List[Track]:
     """
     MusicSection からランダムに Track を取得する。
 
@@ -111,12 +111,12 @@ def get_random_tracks(section: MusicSection, maxresults: int) -> list[Track]:
         maxresults (int): 取得するトラック数。
 
     Returns:
-        list[Artist]: 取得したトラック。
+        List[Artist]: 取得したトラック。
     """
 
     return section.searchTracks(sort="random", maxresults=maxresults)
 
-def get_random_tracks_by_artist(section: MusicSection, maxresults: int, artist: Artist) -> list[Track]:
+def get_random_tracks_by_artist(section: MusicSection, maxresults: int, artist: Artist) -> List[Track]:
     """
     MusicSection から指定したアーティストの Track をランダムに取得する。
 
@@ -126,7 +126,7 @@ def get_random_tracks_by_artist(section: MusicSection, maxresults: int, artist: 
         artist (Artist): 対象のアーティスト。
 
     Returns:
-        list[Artist]: 取得したトラック。
+        List[Artist]: 取得したトラック。
     """
 
     return section.search(
@@ -136,7 +136,7 @@ def get_random_tracks_by_artist(section: MusicSection, maxresults: int, artist: 
         filters={'artist.id': artist.ratingKey}
     )
 
-def get_random_tracks_by_genre(section: MusicSection, maxresult: int, genre: str) -> list[Track]:
+def get_random_tracks_by_genre(section: MusicSection, maxresult: int, genre: str) -> List[Track]:
     """
     MusicSection から指定したジャンルの Track をランダムに取得する。
 
@@ -146,6 +146,6 @@ def get_random_tracks_by_genre(section: MusicSection, maxresult: int, genre: str
     genre (str): 対象のジャンル。
 
     Returns:
-        list[Artist]: 取得したトラック。
+        List[Artist]: 取得したトラック。
     """
     section.searchTracks(sort='random', maxresults=maxresult, style=genre)
