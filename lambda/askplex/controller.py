@@ -707,7 +707,7 @@ class Controller:
         """
 
         self.logger.debug('In add_plex_tracks()')
-        
+
         persistence_attr = self.handler_input.attributes_manager.persistent_attributes
         playback_info = persistence_attr.get("playback_info")
         for plex_track in plex_track_list:
@@ -781,17 +781,19 @@ class Controller:
             speak_output = data[prompts.SKILL_INTENT_SLOTS_MISSING]
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
+        
+        artist_query = self._normalize(artist.value)
 
         # Search for the artist
         try:
-            artist_result = plexapi_utils.get_artist(Controller._section, artist.value)
+            artist_result = plexapi_utils.get_artist(Controller._section, artist_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if artist_result is None:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist_query)
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
@@ -841,36 +843,39 @@ class Controller:
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
+        artist_query = self._normalize(artist.value)
+        song_query = self._normalize(song.value)
+
         # Search for the artist
         try:
-            artist_result = plexapi_utils.get_artist(Controller._section, artist.value)
+            artist_result = plexapi_utils.get_artist(Controller._section, artist_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if artist_result is None:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist_query)
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
         # Search for the song
         try:
-            plex_track = plexapi_utils.get_track(artist_result, song.value)
+            plex_track = plexapi_utils.get_track(artist_result, song_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song.value, artist=artist.value)
+            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song_query, artist=artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if plex_track is None:
-            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song.value, artist=artist.value)
-            self.logger.error(exception)
+            speak_output = data[prompts.PMS_SONG_SEARCH_ERROR].format(song=song_query, artist=artist_query)
+            self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_track(plex_track)
 
-        playlist_name = data[prompts.PMS_PLNAME_SONG].format(song=song.value, artist=artist.value)
+        playlist_name = data[prompts.PMS_PLNAME_SONG].format(song=song_query, artist=artist_query)
         self.set_playlist_name(playlist_name)
         speak_output = data[prompts.PMS_PLAYING].format(playlist_name)
 
@@ -903,36 +908,39 @@ class Controller:
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
+        artist_query = self._normalize(artist.value)
+        album_query = self._normalize(album.value)
+
         # Search for the artist
         try:
-            artist_result = plexapi_utils.get_artist(Controller._section, artist.value)
+            artist_result = plexapi_utils.get_artist(Controller._section, artist_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_ERROR].format(artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if artist_result is None:
-            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist.value)
+            speak_output = data[prompts.PMS_ARTIST_SEARCH_EMPTY].format(artist_query)
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
         # Search for the album
         try:
-            plex_track_list = plexapi_utils.get_album(artist_result, album.value)
+            plex_track_list = plexapi_utils.get_album(artist_result, album_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_ALBUM_SEARCH_ERROR].format(album.value, artist=artist.value)
+            speak_output = data[prompts.PMS_ALBUM_SEARCH_ERROR].format(album_query, artist=artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if plex_track_list is None:
-            speak_output = data[prompts.PMS_ALBUM_SEARCH_EMPTY].format(album=album.value, artist=artist.value)
+            speak_output = data[prompts.PMS_ALBUM_SEARCH_EMPTY].format(album=album_query, artist=artist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
 
-        playlist_name = data[prompts.PMS_PLNAME_ALBUM].format(album=album.value, artist=artist.value)
+        playlist_name = data[prompts.PMS_PLNAME_ALBUM].format(album=album_query, artist=artist_query)
         self.set_playlist_name(playlist_name)
         speak_output = data[prompts.PMS_PLAYING].format(playlist_name)
 
@@ -964,23 +972,25 @@ class Controller:
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
+        genre_query = self._normalize(genre.value)
+
         # Search for the style (Plex server is more specfic with style than genre tags)
         try:
-            plex_track_list = plexapi_utils.get_random_tracks_by_genre(Controller._section, config.PMS_DEFAULT_MAX_RESULTS, genre.value)
+            plex_track_list = plexapi_utils.get_random_tracks_by_genre(Controller._section, config.PMS_DEFAULT_MAX_RESULTS, genre_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_GENRE_SEARCH_ERROR].format(genre.value)
+            speak_output = data[prompts.PMS_GENRE_SEARCH_ERROR].format(genre_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if len(plex_track_list)==0:
-            speak_output = data[prompts.PMS_GENRE_SEARCH_EMPTY].format(genre.value)
+            speak_output = data[prompts.PMS_GENRE_SEARCH_EMPTY].format(genre_query)
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
 
-        playlist_name = data[prompts.PMS_PLNAME_MUSIC_BY_GENRE].format(genre.value)
+        playlist_name = data[prompts.PMS_PLNAME_MUSIC_BY_GENRE].format(genre_query)
         self.set_playlist_name(playlist_name)
         speak_output = data[prompts.PMS_PLAYING].format(playlist_name)
 
@@ -1012,29 +1022,40 @@ class Controller:
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
+        playlist_query = self._normalize(playlist.value)
+
         # Search for the playlist
         try:
-            plex_track_list = plexapi_utils.get_playlist(Controller._section._server, playlist.value)
+            plex_track_list = plexapi_utils.get_playlist(Controller._section._server, playlist_query)
         except Exception as exception:
-            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_ERROR].format(playlist.value)
+            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_ERROR].format(playlist_query)
             self.logger.error(exception)
             return self._build_speak_ask_response(speak_output)
 
         if plex_track_list is None:
-            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_EMPTY].format(playlist.value)
+            speak_output = data[prompts.PMS_PLAYLIST_SEARCH_EMPTY].format(playlist_query)
             self.logger.error(speak_output)
             return self._build_speak_ask_response(speak_output)
 
         self.clear_playlist()
         self.add_plex_tracks(plex_track_list)
 
-        playlist_name = data[prompts.PMS_PLNAME_PLAYLIST].format(playlist.value)
+        playlist_name = data[prompts.PMS_PLNAME_PLAYLIST].format(playlist_query)
         self.set_playlist_name(playlist_name)
         speak_output = data[prompts.PMS_PLAYING].format(playlist_name)
 
         self.handler_input.response_builder.speak(speak_output)
         self.logger.info(speak_output)
         return self.start_playback()
+
+
+    def _normalize(self, source):
+        """
+        スロット値にスキル名が混入していたら削除して正規化する
+        """
+        source = source.replace(config.SKILL_INVOCATION_NAME, "").strip()
+        # 「〜で」や「〜を使って」などの助詞も混ざることがあるため、正規化
+        return source.replace("で", "").replace("を使って", "")
 
 
 #
