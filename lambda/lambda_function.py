@@ -214,7 +214,7 @@ class NoHandler(AbstractRequestHandler):
 
             session_attr["request"]="action"
             speak_output = data[prompts.SKILL_WELCOME_REPROMPT]
-            # TODO: Create ASK_SDK Utils.
+            
             handler_input.response_builder.speak(speak_output).ask(speak_output)
 
         return handler_input.response_builder.response
