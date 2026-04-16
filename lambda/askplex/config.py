@@ -2,6 +2,7 @@
 import logging
 
 SKILL_LOG_LEVEL=logging.INFO
+SKILL_INVOCATION_NAME = ""
 
 # Plex Media Server config
 PMS_SERVER_URL = 'https://'
