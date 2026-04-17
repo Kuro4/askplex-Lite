@@ -280,7 +280,7 @@
         "PMS_TRACKS_SEARCH_EMPTY": "すみません、あなたのコレクションに楽曲が見つかりません。",
         "PMS_ARTIST_SEARCH_ERROR": "すみません、 {} を検索中にエラーが発生しました。",
         "PMS_ARTIST_SEARCH_EMPTY": "すみません、あなたのコレクションに {} が見つかりません。",
-        "PMS_SONG_SEARCH_ERROR": "すみません、 {song} by {artist} の曲を検索中にエラーが発生しました。",
+        "PMS_SONG_SEARCH_ERROR": "すみません、 {artist} の {song} を検索中にエラーが発生しました。",
         "PMS_SONG_SEARCH_EMPTY": "すみません、あなたのコレクションに {artist} の {song} が見つかりません。",
         "PMS_ALBUM_SEARCH_ERROR": "すみません、 {artist} のアルバム {album} を検索中にエラーが発生しました。",
         "PMS_ALBUM_SEARCH_EMPTY": "すみません、 {artist} のアルバム {album} には曲がありません。",
