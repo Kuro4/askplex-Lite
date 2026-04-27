@@ -1,12 +1,8 @@
-# AskPlex
+# AskPlex-Lite
 
-AskPlex is an Alexa skill that allows you to play music hosted by your Plex Media Server (PMS).
-The official Plex skill is not available in all regions, so this skill serves as an alternative.
+AskPlex-Lite は[askplex](https://github.com/andresponte/askplex)をもとに、通信部分の軽量化を図ったものです。
+また、ドメインを持っていない場合でも https://app.plex.tv 経由で接続できるようになっています。
+詳しくは[こちらの記事](https://qiita.com/kuro4/items/ecf8df5199ddbb62c6cf)をご覧ください。
 
-> ***Disclaimer:*** AskPlex does not provide any media content or sources. Users must provide their own content from a Plex Media Server. The AskPlex project does not support bootleg content or other illegally sourced material.
-
-### Documentation
-[AskPlex Wiki](https://github.com/andresponte/askplex/wiki)
-
-### Acknowledgements
-This skill was inspired by [AskNavidrome](https://github.com/rosskouk/asknavidrome).
+## 謝辞
+オリジナルである[askplex](https://github.com/andresponte/askplex)を作成した[Andrés Ponte](https://github.com/andresponte)さんに感謝申し上げます。
